@@ -56,16 +56,16 @@ Write-Host -ForegroundColor $color "RAW data unzipping completed"
 #Data cleaning and extract useful information from the unzipped log and output to CSV
 Write-Host -ForegroundColor $color "Start to clean and analyze the data, and then output to CSV..."
 Get-Content .\Helpdesk_interview_data_set.txt | Where-Object { 
--not ([string]::IsNullOrEmpty($_) -or [string]::IsNullOrWhiteSpace($_) -or $_.contains("--- last message repeated * time ---") -or $_.contains("syslogd[113]") -or $_.startswith("	ASL Module") -or $_.startswith("	Those messages") -or $_.startswith("	Output parameters"))
+-not ([string]::IsNullOrEmpty($_) -or [string]::IsNullOrWhiteSpace($_) -or $_.contains('---') -or $_.contains('syslogd[113]') -or $_.startswith('	'))
 } | ForEach-Object {
     [PSCustomObject]@{
-        timeSlot = $_.split()[2].substring(0,2)
         deviceName = $_.split()[3]
+        processId = $_.substring($_.indexof("[")+1,$_.indexof("]")-$_.indexof("[")-1)
         processName = $_.split()[4].split("[")[0]
-        processId = $_.substring($_.indexof("[")+1,$_.indexof("]")-$_.indexof("["))
-        description = $_.substring($_.indexof("]")+2,$_.length-$_.indexof("]")-2) -replace ",",";" 
+        description = $_.substring($_.indexof("]")+2,$_.length-$_.indexof("]")-2) -replace ",",";"
+        timeWindow = $_.split()[2].substring(0,2)         
     }
-} | Group-Object timeSlot,deviceName,processName,processId,description  | ForEach-Object { $_.Name+","+$_.count} | ac .\temp.csv 
+} | Group-Object deviceName,processId,processName,description,timeWindow | ForEach-Object { $_.Name+","+$_.count} | ac .\temp.csv 
 
 while((Test-Path .\temp.csv) -eq $null) {
     sleep 1
@@ -74,7 +74,7 @@ while((Test-Path .\temp.csv) -eq $null) {
 Write-Host -ForegroundColor $color "CSV file generated"
 
 #Importing CSV and add headers
-$csv = import-Csv -Path .\temp.csv -Header ("timeSlot","deviceName","processName","processId","desciption","count") 
+$csv = import-Csv -Path .\temp.csv -Header ("deviceName","processId","processName","desciption","timeWindow","numberOfOccurrence") 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #Convert analysis result to Json and post to website
